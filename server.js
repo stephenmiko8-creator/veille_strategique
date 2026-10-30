@@ -3,7 +3,7 @@ import {readFile, readFileSync} from 'node:fs';
 import {extname, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const envPath = resolve(root, '.env');
 try {
   const raw = readFileSync(envPath, 'utf8');
