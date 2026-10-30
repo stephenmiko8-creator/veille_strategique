@@ -6,8 +6,9 @@ Application web en cours de construction pour lancer une analyse stratégique à
 
 - Interface web servie par un backend Node.js (`server.js`).
 - Endpoint `GET /api/status` indiquant si la recherche est configurée, sans exposer de secret.
-- Endpoint `POST /api/analyze` qui interroge Gemini avec Grounding Google Search, puis renvoie une première synthèse, les requêtes et références associées.
-- Les dossiers sont enregistrés localement dans `D:\projet IA\veuille_strategique\analyses.json` via une couche isolée (`analysis-store.js`), remplaçable par un adaptateur Supabase lors de la migration. `DATA_DIR` permet de changer le dossier.
+- Les étapes d’identification, de collecte et d’analyse déclenchent chacune Gemini avec Google Search; les références sont étiquetées par étape.
+- Endpoint `POST /api/analyze-step` pour exécuter et reprendre séparément chaque étape.
+- Les dossiers sont enregistrés localement dans le dossier défini par `DATA_DIR` (valeur par défaut : `./data`) sous forme d’instantanés JSON via `analysis-store.js`, remplaçable par un adaptateur Supabase lors de la migration.
 - Routes `GET /api/analyses` et `POST /api/analyses` pour relire et enregistrer les dossiers. Les données ne sont pas envoyées à GitHub.
 - La clé `GEMINI_API_KEY` est lue depuis `.env` côté serveur. Elle n’est jamais envoyée au navigateur ni enregistrée dans Git.
 - Garde-fou local : au plus cinq recherches par minute.
@@ -27,7 +28,7 @@ Sans clé, l’interface et l’API de statut fonctionnent, mais aucune recherch
 
 - Gemini lance une recherche Google et propose une première synthèse avec citations ; les documents d’origine doivent être vérifiés avant d’utiliser les chiffres.
 - L’extraction structurée des chiffres financiers, détection de conflits, validation humaine et génération complète du rapport restent à construire.
-- Les dossiers sont conservés uniquement dans la mémoire de la page et disparaissent au rechargement.
+- Les dossiers et résultats des étapes sont conservés sur le disque D et rechargés à l’ouverture.
 - L’application reste prévue pour un usage local. Avant toute mise en ligne : authentification, base de données, isolation des comptes, protections anti-abus, règles de confidentialité et hébergement sécurisé de la clé.
 
 ## Évolution prévue
