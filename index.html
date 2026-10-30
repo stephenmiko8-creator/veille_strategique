@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f8">
+  <title>Veille — Strategic Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#home" aria-label="Veille, accueil">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span>veille<span class="brand-dot">.</span></span>
+      </a>
+      <div class="workspace-label">ESPACE DE TRAVAIL</div>
+      <nav class="main-nav" aria-label="Navigation principale">
+        <a class="nav-item active" href="#home"><span class="nav-icon">⌂</span>Vue d’ensemble</a>
+        <a class="nav-item" href="#analyses" id="nav-analyses"><span class="nav-icon">◷</span>Mes analyses <span class="nav-count" id="analysis-count">0</span></a>
+      </nav>
+      <div class="sidebar-divider"></div>
+      <div class="workspace-label">OUTILS</div>
+      <a class="nav-item" href="#sources" id="nav-sources"><span class="nav-icon">⌕</span>Sources & preuves</a>
+      <a class="nav-item" href="#settings" id="nav-settings"><span class="nav-icon">⚙</span>Configuration</a>
+      <div class="sidebar-bottom">
+        <div class="plan-card">
+          <div class="plan-icon">✳</div>
+          <div><strong>Votre espace</strong><span>Prototype local</span></div>
+          <span class="plan-status"></span>
+        </div>
+        <div class="user-row"><div class="avatar">MK</div><div class="user-meta"><strong>Miko</strong><span>Analyste</span></div><button class="more-button" aria-label="Options">···</button></div>
+      </div>
+    </aside>
+
+    <main class="main-content" id="home">
+      <header class="topbar">
+        <div class="breadcrumbs"><span>Espace de travail</span><span class="crumb-sep">/</span><strong>Vue d’ensemble</strong></div>
+        <div class="topbar-actions"><span class="system-status"><i></i> Système opérationnel</span><button class="icon-button" aria-label="Notifications">♧<b></b></button><div class="avatar small">MK</div></div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="welcome-row">
+          <div><div class="eyebrow"><span class="eyebrow-line"></span>INTELLIGENCE STRATÉGIQUE</div><h1>Voyez ce qui se dessine.</h1><p class="welcome-copy">Lancez une analyse ciblée. Chaque conclusion reste reliée à ses sources.</p></div>
+          <button class="text-button" id="how-it-works"><span class="help-icon">?</span> Comment ça marche</button>
+        </section>
+
+        <section class="launch-card" aria-labelledby="launch-title">
+          <div class="launch-card-content">
+            <div class="launch-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5M10.8 7.6v6.4M7.6 10.8H14"></path></svg></div>
+            <div class="launch-copy"><span class="section-kicker">NOUVELLE ANALYSE</span><h2 id="launch-title">Quelle entreprise souhaitez-vous analyser ?</h2><p>Une analyse à la demande, sans liste d’entreprises à maintenir.</p></div>
+          </div>
+          <form class="search-form" id="company-form">
+            <label class="sr-only" for="company-name">Nom de l’entreprise</label>
+            <input id="company-name" name="company" autocomplete="organization" placeholder="Nom de l’entreprise (ex. Schneider Electric)" required>
+            <button type="submit" class="primary-button">Lancer l’analyse <span>→</span></button>
+          </form>
+          <div class="launch-foot"><span><i class="tiny-lock">◆</i> Recherche publique et informations fournies par vous</span><span>Vous gardez le contrôle des données utilisées</span></div>
+        </section>
+
+        <section class="process-strip" aria-label="Étapes de l’analyse">
+          <div class="process-heading"><span class="section-kicker">UN PROCESSUS TRAÇABLE</span><span class="process-note">Aucune donnée contradictoire n’est arbitrée automatiquement.</span></div>
+          <div class="process-steps">
+            <div class="process-step"><span class="step-number">01</span><div><strong>Collecter</strong><span>Sources publiques datées</span></div></div><span class="step-arrow">→</span>
+            <div class="process-step"><span class="step-number">02</span><div><strong>Confronter</strong><span>Écarts et données manquantes</span></div></div><span class="step-arrow">→</span>
+            <div class="process-step"><span class="step-number">03</span><div><strong>Analyser</strong><span>Signaux reliés aux finances</span></div></div><span class="step-arrow">→</span>
+            <div class="process-step"><span class="step-number">04</span><div><strong>Restituer</strong><span>Rapport et piste d’audit</span></div></div>
+          </div>
+        </section>
+
+        <div class="section-title-row" id="analyses"><div><span class="section-kicker">VOTRE ACTIVITÉ</span><h2>Analyses récentes</h2></div><button class="quiet-button" id="show-all">Voir tout <span>→</span></button></div>
+        <section id="analysis-list" class="analysis-list" aria-live="polite">
+          <div class="empty-state" id="empty-state"><div class="empty-illustration"><span class="empty-ring ring-one"></span><span class="empty-ring ring-two"></span><span class="empty-center">⌕</span><i class="empty-star">✳</i></div><strong>Votre première analyse commence ici</strong><p>Entrez un nom d’entreprise pour préparer le parcours d’analyse.</p></div>
+        </section>
+
+        <footer class="footer"><span>VEILLE <b>·</b> Prototype de travail</span><span>Les analyses nécessitent un connecteur de recherche et des sources configurés.</span></footer>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="analysis-dialog" class="analysis-dialog">
+    <form method="dialog"><button class="dialog-close" aria-label="Fermer">×</button></form>
+    <div class="dialog-top"><span class="dialog-symbol">◎</span><span class="status-pill pending"><i></i> Préparation</span></div>
+    <span class="section-kicker">ANALYSE À LA DEMANDE</span>
+    <h2 id="dialog-company">Entreprise</h2>
+    <p class="dialog-lead">Le dossier est prêt. La collecte de sources externes doit être connectée avant de produire des constats vérifiés.</p>
+    <div class="readiness-box"><div class="readiness-icon">↗</div><div><strong>Collecte externe non configurée</strong><span>Aucun résultat ni chiffre ne sera inventé. Une fois la recherche activée, chaque fait affichera sa source, sa date et son périmètre.</span></div></div>
+    <div class="dialog-checklist"><div><span class="check-neutral">1</span><span><strong>Identifier l’entreprise</strong><small>Nom transmis : <b id="dialog-name-inline"></b></small></span><span class="done-label">FAIT</span></div><div><span class="check-neutral">2</span><span><strong>Collecter et recouper les sources</strong><small>Connecteur web à configurer</small></span><span class="pending-label">À FAIRE</span></div><div><span class="check-neutral">3</span><span><strong>Vous solliciter si nécessaire</strong><small>Conflits chiffrés ou données privées manquantes</small></span><span class="pending-label">ENSUITE</span></div></div>
+    <div class="dialog-actions"><button class="secondary-button" id="copy-brief">Copier le brief d’analyse</button><button class="primary-button" id="dialog-done">Compris <span>✓</span></button></div>
+    <div class="dialog-footnote">Cette version est un prototype d’interface. Elle ne lance pas encore de recherche web.</div>
+  </dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
+
