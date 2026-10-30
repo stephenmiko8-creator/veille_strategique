@@ -71,20 +71,34 @@ function answerText(candidate) {
   return (candidate?.content?.parts || []).map(part => part.text || '').filter(Boolean).join('\n').trim();
 }
 
-function citationAnswer(text, supports) {
+function citationAnswer(text, supports, stageCode) {
   let cited = text;
   const ordered = [...(supports || [])].sort((a, b) => (b.segment?.endIndex ?? 0) - (a.segment?.endIndex ?? 0));
   for (const support of ordered) {
     const end = support.segment?.endIndex;
     const ids = [...new Set(support.groundingChunkIndices || [])].filter(Number.isInteger);
     if (end === undefined || end < 0 || end > cited.length || !ids.length) continue;
-    cited = `${cited.slice(0, end)} [${ids.map(id => id + 1).join(', ')}]${cited.slice(end)}`;
+    cited = `${cited.slice(0, end)} [${ids.map(id => stageCode + '-' + (id + 1)).join(', ')}]${cited.slice(end)}`;
   }
   return cited;
 }
 
-async function runGroundedAnalysis(company) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+const stages = {
+  identify: {
+    code: 'ID', label: 'Identification', prompt: company => 'Identifie précisément l’entreprise « ' + company + ' » : raison sociale ou groupe visé, pays du siège, activités et périmètre, statut coté et identifiant boursier si disponible. Signale toute ambiguïté. Donne des faits datés avec citations. N’entame pas encore l’analyse stratégique.'
+  },
+  collect: {
+    code: 'COL', label: 'Collecte', prompt: (company, context) => 'Collecte les données publiques récentes et vérifiables sur « ' + company + ' ». Identification établie :\n' + context + '\nRecueille les données financières récentes avec période, devise et périmètre; marchés, concurrents, évolutions techniques, économiques, réglementaires et sociales/environnementales; objectifs et indicateurs ESG. Distingue faits et données introuvables. Cite chaque affirmation et indique la date/période des chiffres. Ne fais pas encore de conclusions causales.'
+  },
+  analyze: {
+    code: 'AN', label: 'Analyse', prompt: (company, context) => 'Analyse la veille de « ' + company + ' » à partir des éléments documentés ci-dessous.\n' + context + '\nRelie les dimensions entre elles et aux données financières seulement lorsqu’elles sont explicitement disponibles. Distingue signaux forts à traiter et signaux faibles à surveiller. Sépare les faits sourcés des interprétations. Pour chaque interprétation, cite les faits qui la soutiennent et indique les limites ou éléments contraires. N’invente aucune causalité. Termine par les limites de données et les informations précises à demander à l’utilisateur.'
+  }
+};
+
+async function runGroundedStage(company, stageKey, context = '') {
+  const stage = stages[stageKey];
+  if (!stage) throw Object.assign(new Error('Étape Gemini inconnue.'), {status: 400});
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90_000);
   let response;
@@ -95,15 +109,13 @@ async function runGroundedAnalysis(company) {
       body: JSON.stringify({
         systemInstruction: {parts: [{text: [
           'Tu es analyste de veille stratégique. Recherche des informations publiques actuelles avec Google Search et réponds en français.',
-          'Commence par signaler si le nom de société est ambigu et n’attribue pas des données à une entité sans preuve.',
-          'Sépare clairement les faits trouvés, leur source et leur date/période quand disponibles, puis les interprétations.',
-          'Distingue signaux à traiter des éléments qui restent à surveiller. Relie les constats aux chiffres financiers uniquement si les sources donnent ces chiffres.',
-          'N’invente aucun chiffre, causalité, intensité R&D, statut réglementaire ou citation. Mentionne les désaccords entre sources et les données qui manquent.',
-          'Pour chaque affirmation vérifiable, utilise les citations fournies par la recherche. Termine par les limites de cette première collecte et les informations à demander à l’utilisateur.'
+          'N’attribue pas de données à une entité sans preuve. Distingue strictement faits sourcés et interprétations.',
+          'N’invente aucun chiffre, aucune causalité, intensité R&D, statut réglementaire ni citation. Mentionne désaccords et données manquantes.',
+          'Les références fournies par Google Search doivent soutenir les affirmations; date et périmètre des chiffres doivent être précisés.'
         ].join(' ')}]},
-        contents: [{role: 'user', parts: [{text: `Fais une première veille stratégique sourcée sur l’entreprise « ${company} ». Couvre son identité et activité, ses informations financières récentes disponibles, ses marchés et concurrents, les évolutions technologiques, économiques, réglementaires et sociétales/environnementales pertinentes, puis les signaux à suivre. Ne transforme pas l’absence de données en hypothèse.`}]}],
+        contents: [{role: 'user', parts: [{text: stage.prompt(company, context)}]}],
         tools: [{google_search: {}}],
-        generationConfig: {temperature: 0.2, maxOutputTokens: 5000}
+        generationConfig: {temperature: 0.2, maxOutputTokens: stageKey === 'analyze' ? 4500 : 3500}
       }),
       signal: controller.signal
     });
@@ -127,19 +139,14 @@ async function runGroundedAnalysis(company) {
     if (!web?.uri) return [];
     let hostname = '';
     try { hostname = new URL(web.uri).hostname; } catch {}
-    return [{number: index + 1, url: web.uri, title: web.title || hostname, hostname}];
+    return [{number: index + 1, stage: stage.label, stageCode: stage.code, url: web.uri, title: web.title || hostname, hostname}];
   });
   const answer = answerText(candidate);
   if (!answer) throw Object.assign(new Error('Gemini a renvoyé une réponse vide ou bloquée.'), {status: 502});
   return {
-    company,
-    provider: 'Gemini API + Google Search',
-    model,
-    collectedAt: new Date().toISOString(),
-    searchQueries: metadata.webSearchQueries || [],
-    answer: citationAnswer(answer, metadata.groundingSupports),
-    grounded: sources.length > 0,
-    sources
+    key: stageKey, label: stage.label, provider: 'Gemini API + Google Search', model,
+    collectedAt: new Date().toISOString(), searchQueries: metadata.webSearchQueries || [],
+    answer: citationAnswer(answer, metadata.groundingSupports, stage.code), grounded: sources.length > 0, sources
   };
 }
 
@@ -150,11 +157,11 @@ const server = createServer(async (request, response) => {
   }
   if (request.method === 'GET' && url.pathname === '/api/analyses') {
     try { return sendJson(response, 200, {analyses: await listAnalyses()}); }
-    catch { return sendJson(response, 500, {error: 'Le stockage local des analyses est indisponible.'}); }
+    catch (error) { console.error('Analysis list failed:', error?.name, error?.message); return sendJson(response, 500, {error: 'Le stockage local des analyses est indisponible.'}); }
   }
   if (request.method === 'POST' && url.pathname === '/api/analyses') {
     try {
-      const payload = await readJson(request, 100_000);
+      const payload = await readJson(request, 250_000);
       const item = payload.analysis;
       if (!item || typeof item.name !== 'string' || item.name.trim().length < 2 || item.name.length > 150) {
         return sendJson(response, 400, {error: 'Le dossier doit contenir un nom d’entreprise valide.'});
@@ -165,16 +172,36 @@ const server = createServer(async (request, response) => {
         date: typeof item.date === 'string' ? item.date.slice(0, 80) : '',
         status: typeof item.status === 'string' ? item.status.slice(0, 40) : 'saved',
         error: typeof item.error === 'string' ? item.error.slice(0, 1000) : undefined,
-        answer: typeof item.answer === 'string' ? item.answer.slice(0, 30_000) : '',
+        answer: typeof item.answer === 'string' ? item.answer.slice(0, 80_000) : '',
         grounded: Boolean(item.grounded),
         sources: Array.isArray(item.sources) ? item.sources.slice(0, 100) : [],
-        searchQueries: Array.isArray(item.searchQueries) ? item.searchQueries.slice(0, 30) : [],
+        searchQueries: Array.isArray(item.searchQueries) ? item.searchQueries.slice(0, 60) : [],
+        steps: Array.isArray(item.steps) ? item.steps.slice(0, 3) : [],
+        errorStage: typeof item.errorStage === 'string' ? item.errorStage.slice(0, 40) : undefined,
         collectedAt: typeof item.collectedAt === 'string' ? item.collectedAt.slice(0, 80) : undefined,
         provider: typeof item.provider === 'string' ? item.provider.slice(0, 100) : undefined
       });
       return sendJson(response, 200, {analysis: record});
-    } catch {
+    } catch (error) {
+      console.error('Analysis save failed:', error?.name, error?.message);
       return sendJson(response, 500, {error: 'Impossible d’enregistrer le dossier sur le disque local.'});
+    }
+  }
+  if (request.method === 'POST' && url.pathname === '/api/analyze-step') {
+    if (!geminiApiKey) return sendJson(response, 503, {error: 'La variable GEMINI_API_KEY n’est pas configurée dans le fichier .env local.'});
+    if (rateLimitReached()) return sendJson(response, 429, {error: 'Limite locale atteinte : maximum cinq appels Gemini par minute.'});
+    try {
+      const payload = await readJson(request, 50_000);
+      const company = typeof payload.company === 'string' ? payload.company.trim() : '';
+      const stage = typeof payload.stage === 'string' ? payload.stage : '';
+      const context = typeof payload.context === 'string' ? payload.context.slice(0, 30_000) : '';
+      if (company.length < 2 || company.length > 150) return sendJson(response, 400, {error: 'Le nom de l’entreprise doit contenir entre 2 et 150 caractères.'});
+      if (!stages[stage]) return sendJson(response, 400, {error: 'Étape Gemini invalide.'});
+      const result = await runGroundedStage(company, stage, context);
+      return sendJson(response, 200, result);
+    } catch (error) {
+      console.error('Gemini stage failed:', error?.name, error?.message);
+      return sendJson(response, error.status || 502, {error: error.status ? error.message : 'L’étape Gemini a échoué ou a expiré.'});
     }
   }
   if (request.method === 'POST' && url.pathname === '/api/analyze') {
@@ -186,7 +213,7 @@ const server = createServer(async (request, response) => {
       if (company.length < 2 || company.length > 150) {
         return sendJson(response, 400, {error: 'Le nom de l’entreprise doit contenir entre 2 et 150 caractères.'});
       }
-      const result = await runGroundedAnalysis(company);
+      const result = await runGroundedStage(company, 'collect');
       const saved = await saveAnalysis({id: payload.id, name: company, date: new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date()), status: 'collected', ...result});
       return sendJson(response, 200, saved);
     } catch (error) {
