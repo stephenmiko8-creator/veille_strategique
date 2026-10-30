@@ -77,7 +77,7 @@
           <div class="empty-state" id="empty-state"><div class="empty-illustration"><span class="empty-ring ring-one"></span><span class="empty-ring ring-two"></span><span class="empty-center">⌕</span><i class="empty-star">✳</i></div><strong>Votre première analyse commence ici</strong><p>Entrez un nom d’entreprise pour préparer le parcours d’analyse.</p></div>
         </section>
 
-        <footer class="footer"><span>VEILLE <b>·</b> Prototype de travail</span><span>Connecteur Brave préparé · Clé API requise pour lancer une recherche.</span></footer>
+        <footer class="footer"><span>VEILLE <b>·</b> Prototype de travail</span><span>Gemini + recherche Google · Clé API configurée côté serveur.</span></footer>
       </div>
     </main>
   </div>
@@ -89,10 +89,10 @@
     <h2 id="dialog-company">Entreprise</h2>
     <p class="dialog-lead" id="dialog-lead">Préparation de la collecte des sources publiques.</p>
     <div class="readiness-box" id="readiness-box"><div class="readiness-icon">↗</div><div><strong id="readiness-title">Connexion au moteur de recherche</strong><span id="readiness-description">La clé API reste côté serveur. Aucun résultat ne sera inventé si le connecteur n’est pas configuré.</span></div></div>
-    <section class="search-results" id="search-result-area" hidden aria-live="polite"><div class="results-heading"><strong id="results-count">Sources</strong><span id="results-date"></span></div><div id="source-results"></div><p class="source-caveat">Ces résultats sont des pistes de source, pas encore des faits validés. Ouvrir et vérifier les documents avant toute conclusion.</p></section>
+    <section class="search-results" id="search-result-area" hidden aria-live="polite"><div class="results-heading"><strong id="results-count">Sources</strong><span id="results-date"></span></div><div id="analysis-answer" class="analysis-answer"></div><div class="query-list" id="query-list"></div><div id="source-results"></div><p class="source-caveat">La synthèse est générée par IA et les sources doivent être ouvertes et vérifiées. Les divergences de chiffres ne sont pas encore extraites automatiquement.</p></section>
     <div class="dialog-checklist"><div><span class="check-neutral">1</span><span><strong>Identifier l’entreprise</strong><small>Nom transmis : <b id="dialog-name-inline"></b></small></span><span class="done-label">FAIT</span></div><div><span class="check-neutral">2</span><span><strong>Collecter des sources publiques</strong><small>Recherche web avec références conservées</small></span><span class="pending-label" id="collection-step-status">EN ATTENTE</span></div><div><span class="check-neutral">3</span><span><strong>Recouper et analyser</strong><small>Comparaison des chiffres et interprétation à venir</small></span><span class="pending-label">ENSUITE</span></div></div>
     <div class="dialog-actions"><button class="secondary-button" id="copy-brief">Copier le brief d’analyse</button><button class="primary-button" id="dialog-done">Compris <span>✓</span></button></div>
-    <div class="dialog-footnote">La collecte retourne des sources et extraits. Les chiffres doivent être vérifiés sur les documents d’origine.</div>
+    <div class="dialog-footnote">Gemini avec recherche Google · Une analyse peut déclencher plusieurs requêtes de recherche.</div>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="app.js"></script>
