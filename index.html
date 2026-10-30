@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="integration.css">
 </head>
 <body>
   <div class="app-shell">
@@ -39,7 +40,7 @@
     <main class="main-content" id="home">
       <header class="topbar">
         <div class="breadcrumbs"><span>Espace de travail</span><span class="crumb-sep">/</span><strong>Vue d’ensemble</strong></div>
-        <div class="topbar-actions"><span class="system-status"><i></i> Système opérationnel</span><button class="icon-button" aria-label="Notifications">♧<b></b></button><div class="avatar small">MK</div></div>
+        <div class="topbar-actions"><span class="system-status" id="system-status"><i></i> Vérification du moteur…</span><button class="icon-button" aria-label="Notifications">♧<b></b></button><div class="avatar small">MK</div></div>
       </header>
 
       <div class="content-wrap">
@@ -76,7 +77,7 @@
           <div class="empty-state" id="empty-state"><div class="empty-illustration"><span class="empty-ring ring-one"></span><span class="empty-ring ring-two"></span><span class="empty-center">⌕</span><i class="empty-star">✳</i></div><strong>Votre première analyse commence ici</strong><p>Entrez un nom d’entreprise pour préparer le parcours d’analyse.</p></div>
         </section>
 
-        <footer class="footer"><span>VEILLE <b>·</b> Prototype de travail</span><span>Les analyses nécessitent un connecteur de recherche et des sources configurés.</span></footer>
+        <footer class="footer"><span>VEILLE <b>·</b> Prototype de travail</span><span>Connecteur Brave préparé · Clé API requise pour lancer une recherche.</span></footer>
       </div>
     </main>
   </div>
@@ -86,11 +87,12 @@
     <div class="dialog-top"><span class="dialog-symbol">◎</span><span class="status-pill pending"><i></i> Préparation</span></div>
     <span class="section-kicker">ANALYSE À LA DEMANDE</span>
     <h2 id="dialog-company">Entreprise</h2>
-    <p class="dialog-lead">Le dossier est prêt. La collecte de sources externes doit être connectée avant de produire des constats vérifiés.</p>
-    <div class="readiness-box"><div class="readiness-icon">↗</div><div><strong>Collecte externe non configurée</strong><span>Aucun résultat ni chiffre ne sera inventé. Une fois la recherche activée, chaque fait affichera sa source, sa date et son périmètre.</span></div></div>
-    <div class="dialog-checklist"><div><span class="check-neutral">1</span><span><strong>Identifier l’entreprise</strong><small>Nom transmis : <b id="dialog-name-inline"></b></small></span><span class="done-label">FAIT</span></div><div><span class="check-neutral">2</span><span><strong>Collecter et recouper les sources</strong><small>Connecteur web à configurer</small></span><span class="pending-label">À FAIRE</span></div><div><span class="check-neutral">3</span><span><strong>Vous solliciter si nécessaire</strong><small>Conflits chiffrés ou données privées manquantes</small></span><span class="pending-label">ENSUITE</span></div></div>
+    <p class="dialog-lead" id="dialog-lead">Préparation de la collecte des sources publiques.</p>
+    <div class="readiness-box" id="readiness-box"><div class="readiness-icon">↗</div><div><strong id="readiness-title">Connexion au moteur de recherche</strong><span id="readiness-description">La clé API reste côté serveur. Aucun résultat ne sera inventé si le connecteur n’est pas configuré.</span></div></div>
+    <section class="search-results" id="search-result-area" hidden aria-live="polite"><div class="results-heading"><strong id="results-count">Sources</strong><span id="results-date"></span></div><div id="source-results"></div><p class="source-caveat">Ces résultats sont des pistes de source, pas encore des faits validés. Ouvrir et vérifier les documents avant toute conclusion.</p></section>
+    <div class="dialog-checklist"><div><span class="check-neutral">1</span><span><strong>Identifier l’entreprise</strong><small>Nom transmis : <b id="dialog-name-inline"></b></small></span><span class="done-label">FAIT</span></div><div><span class="check-neutral">2</span><span><strong>Collecter des sources publiques</strong><small>Recherche web avec références conservées</small></span><span class="pending-label" id="collection-step-status">EN ATTENTE</span></div><div><span class="check-neutral">3</span><span><strong>Recouper et analyser</strong><small>Comparaison des chiffres et interprétation à venir</small></span><span class="pending-label">ENSUITE</span></div></div>
     <div class="dialog-actions"><button class="secondary-button" id="copy-brief">Copier le brief d’analyse</button><button class="primary-button" id="dialog-done">Compris <span>✓</span></button></div>
-    <div class="dialog-footnote">Cette version est un prototype d’interface. Elle ne lance pas encore de recherche web.</div>
+    <div class="dialog-footnote">La collecte retourne des sources et extraits. Les chiffres doivent être vérifiés sur les documents d’origine.</div>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="app.js"></script>
