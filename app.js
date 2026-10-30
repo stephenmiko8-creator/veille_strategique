@@ -34,9 +34,18 @@ function setReadiness({title, description, kind = 'default', step = 'EN ATTENTE'
 function renderResults(result) {
   const area = document.querySelector('#search-result-area');
   const sourceList = document.querySelector('#source-results');
+  const answer = document.querySelector('#analysis-answer');
+  const queryList = document.querySelector('#query-list');
   sourceList.replaceChildren();
+  answer.textContent = result.answer || '';
+  queryList.replaceChildren();
+  if (result.searchQueries?.length) {
+    const label = document.createElement('strong');
+    label.textContent = 'Requêtes exécutées : ';
+    queryList.append(label, document.createTextNode(result.searchQueries.join(' · ')));
+  }
   const sources = Array.isArray(result.sources) ? result.sources : [];
-  document.querySelector('#results-count').textContent = `${sources.length} source${sources.length > 1 ? 's' : ''} trouvée${sources.length > 1 ? 's' : ''}`;
+  document.querySelector('#results-count').textContent = `${sources.length} source${sources.length > 1 ? 's' : ''} citée${sources.length > 1 ? 's' : ''}`;
   document.querySelector('#results-date').textContent = `Collecte ${new Intl.DateTimeFormat('fr-FR', {dateStyle: 'short', timeStyle: 'short'}).format(new Date(result.collectedAt))}`;
   for (const source of sources) {
     let url;
@@ -48,16 +57,11 @@ function renderResults(result) {
     link.href = url.href;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = source.title || url.hostname;
+    link.textContent = `[${source.number || sourceList.children.length + 1}] ${source.title || url.hostname}`;
     const host = document.createElement('div');
     host.className = 'source-host';
     host.textContent = source.hostname || url.hostname;
     item.append(link, host);
-    for (const snippet of (source.snippets || []).slice(0, 2)) {
-      const text = document.createElement('p');
-      text.textContent = snippet;
-      item.append(text);
-    }
     sourceList.append(item);
   }
   area.hidden = false;
@@ -78,14 +82,14 @@ function renderAnalyses() {
     const title = document.createElement('strong');
     title.textContent = analysis.name;
     const detail = document.createElement('span');
-    detail.textContent = analysis.sources?.length ? `${analysis.sources.length} source(s) recueillie(s) · À vérifier` : 'Recherche publique · Sources à collecter';
+    detail.textContent = analysis.sources?.length ? `${analysis.sources.length} source(s) citée(s) · À vérifier` : 'Recherche publique · Sources à collecter';
     info.append(title, detail);
     const date = document.createElement('span');
     date.className = 'analysis-date';
     date.textContent = analysis.date;
     const status = document.createElement('span');
-    status.className = `status-pill ${analysis.sources?.length ? '' : 'pending'}`;
-    if (analysis.sources?.length) status.textContent = 'Sources reçues';
+    status.className = `status-pill ${analysis.answer ? '' : 'pending'}`;
+    if (analysis.answer) status.textContent = analysis.grounded ? 'Synthèse sourcée' : 'À vérifier';
     else { const dot = document.createElement('i'); status.append(dot, document.createTextNode(' À compléter')); }
     card.append(logo, info, date, status);
     card.style.cursor = 'pointer';
@@ -106,13 +110,13 @@ function openAnalysis(analysis) {
   document.querySelector('#dialog-name-inline').textContent = analysis.name;
   document.querySelector('#search-result-area').hidden = true;
   document.querySelector('#source-results').replaceChildren();
-  if (analysis.sources?.length) {
-    setReadiness({title: 'Résultats de recherche reçus', description: 'Les extraits et URLs ci-dessous sont des pistes à contrôler sur les sources originales.', kind: 'default', step: 'REÇUES', lead: 'La collecte a retourné des sources publiques. Aucune conclusion financière ou stratégique n’est générée à ce stade.'});
+  if (analysis.answer) {
+    setReadiness({title: analysis.grounded ? 'Synthèse reliée aux sources' : 'Synthèse sans citation', description: analysis.grounded ? 'Les références et requêtes Google sont conservées pour contrôle.' : 'Gemini n’a retourné aucun lien de recherche vérifiable pour cette réponse.', kind: 'default', step: analysis.grounded ? 'SOURCÉE' : 'À CONTRÔLER', lead: 'Première synthèse automatique. Les chiffres et interprétations doivent être vérifiés avant toute décision.'});
     renderResults(analysis);
   } else if (analysis.status === 'searching') {
     setReadiness({title: 'Recherche en cours', description: 'Interrogation du moteur de recherche public.', kind: 'loading', step: 'EN COURS', lead: 'La collecte de sources est en cours.'});
   } else {
-    setReadiness({title: 'Recherche non disponible', description: analysis.error || 'Vérifiez que le backend est lancé et que la clé Brave est configurée dans le fichier .env.', kind: 'error', step: 'À CONFIGURER', lead: 'Aucune source n’a été collectée. Le système ne remplace pas les résultats absents par des données simulées.'});
+    setReadiness({title: 'Recherche non disponible', description: analysis.error || 'Vérifiez que le backend est lancé et que GEMINI_API_KEY est configurée dans le fichier .env.', kind: 'error', step: 'À CONFIGURER', lead: 'Aucune source n’a été collectée. Le système ne remplace pas les résultats absents par des données simulées.'});
   }
   if (!dialog.open) dialog.showModal();
 }
@@ -124,11 +128,11 @@ async function checkBackend() {
     if (data.searchConfigured) {
       systemStatus.classList.remove('disconnected');
       systemStatus.classList.add('connected');
-      systemStatus.lastChild.textContent = ' Recherche connectée';
+      systemStatus.lastChild.textContent = ' Gemini configuré';
     } else {
       systemStatus.classList.add('disconnected');
       systemStatus.classList.remove('connected');
-      systemStatus.lastChild.textContent = ' Clé de recherche à configurer';
+      systemStatus.lastChild.textContent = ' Clé Gemini à configurer';
     }
   } catch {
     systemStatus.classList.add('disconnected');
@@ -149,6 +153,9 @@ async function collectSources(analysis) {
     if (!response.ok) throw new Error(data.error || `Le serveur a répondu ${response.status}.`);
     analysis.status = 'collected';
     analysis.sources = data.sources || [];
+    analysis.answer = data.answer || '';
+    analysis.grounded = Boolean(data.grounded);
+    analysis.searchQueries = data.searchQueries || [];
     analysis.collectedAt = data.collectedAt;
     analysis.provider = data.provider;
     analysis.date = new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date());
@@ -187,7 +194,7 @@ document.querySelector('#how-it-works').addEventListener('click', () => notify('
 document.querySelector('#show-all').addEventListener('click', () => document.querySelector('#analyses').scrollIntoView({behavior: 'smooth'}));
 document.querySelector('#nav-analyses').addEventListener('click', event => { event.preventDefault(); document.querySelector('#analyses').scrollIntoView({behavior: 'smooth'}); });
 document.querySelector('#nav-sources').addEventListener('click', event => { event.preventDefault(); notify('Les résultats de chaque collecte sont affichés dans le dossier correspondant.'); });
-document.querySelector('#nav-settings').addEventListener('click', event => { event.preventDefault(); notify('La clé Brave se configure côté serveur dans .env.'); });
+document.querySelector('#nav-settings').addEventListener('click', event => { event.preventDefault(); notify('La clé Gemini se configure côté serveur dans .env.'); });
 renderAnalyses();
 void checkBackend();
 
