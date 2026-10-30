@@ -1,6 +1,6 @@
 import {createServer} from 'node:http';
 import {readFile, readFileSync} from 'node:fs';
-import {extname, resolve, sep} from 'node:path';
+import {extname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
@@ -18,6 +18,7 @@ const port = Number(process.env.PORT || 3000);
 const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
 const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
 const requestTimestamps = [];
+const publicFiles = new Set(['/index.html', '/styles.css', '/integration.css', '/app.js']);
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -166,8 +167,8 @@ const server = createServer(async (request, response) => {
   let pathname;
   try { pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname); }
   catch { return sendJson(response, 400, {error: 'Chemin invalide.'}); }
+  if (!publicFiles.has(pathname)) return sendJson(response, 404, {error: 'Fichier introuvable.'});
   const filePath = resolve(root, `.${pathname}`);
-  if (filePath !== root && !filePath.startsWith(root + sep)) return sendJson(response, 403, {error: 'Accès refusé.'});
   readFile(filePath, (error, contents) => {
     if (error) return sendJson(response, 404, {error: 'Fichier introuvable.'});
     response.writeHead(200, {'content-type': mimeTypes[extname(filePath)] || 'application/octet-stream', 'x-content-type-options': 'nosniff'});
