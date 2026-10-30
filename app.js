@@ -147,7 +147,7 @@ async function collectSources(analysis) {
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({company: analysis.name})
+      body: JSON.stringify({company: analysis.name, id: analysis.id})
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Le serveur a répondu ${response.status}.`);
@@ -158,27 +158,55 @@ async function collectSources(analysis) {
     analysis.searchQueries = data.searchQueries || [];
     analysis.collectedAt = data.collectedAt;
     analysis.provider = data.provider;
-    analysis.date = new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date());
+    analysis.id = data.id;
+    analysis.updatedAt = data.updatedAt;
+    analysis.date = data.date || new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date());
     openAnalysis(analysis);
     renderAnalyses();
     await checkBackend();
   } catch (error) {
     analysis.status = 'error';
     analysis.error = error.message;
+    void saveAnalysis(analysis);
     setReadiness({title: 'Recherche non terminée', description: error.message, kind: 'error', step: 'NON TERMINÉE', lead: 'Aucune source validée n’a été ajoutée au dossier.'});
     await checkBackend();
     renderAnalyses();
   }
 }
 
-form.addEventListener('submit', event => {
+async function saveAnalysis(analysis) {
+  try {
+    const response = await fetch('/api/analyses', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({analysis})});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Stockage local indisponible.');
+    Object.assign(analysis, data.analysis);
+    renderAnalyses();
+  } catch (error) {
+    notify('Dossier non enregistré : ' + error.message);
+  }
+}
+
+async function loadAnalyses() {
+  try {
+    const response = await fetch('/api/analyses');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Stockage local indisponible.');
+    analyses = Array.isArray(data.analyses) ? data.analyses : [];
+  } catch (error) {
+    notify('Chargement des dossiers impossible : ' + error.message);
+  }
+  renderAnalyses();
+}
+
+form.addEventListener('submit', async event => {
   event.preventDefault();
   const name = input.value.trim();
   if (name.length < 2) return;
-  const analysis = {name, date: new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date()), sources: [], status: 'searching'};
+  const analysis = {id: crypto.randomUUID(), name, date: new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date()), sources: [], status: 'searching'};
   analyses.unshift(analysis);
   renderAnalyses();
   input.value = '';
+  await saveAnalysis(analysis);
   void collectSources(analysis);
 });
 
@@ -195,6 +223,6 @@ document.querySelector('#show-all').addEventListener('click', () => document.que
 document.querySelector('#nav-analyses').addEventListener('click', event => { event.preventDefault(); document.querySelector('#analyses').scrollIntoView({behavior: 'smooth'}); });
 document.querySelector('#nav-sources').addEventListener('click', event => { event.preventDefault(); notify('Les résultats de chaque collecte sont affichés dans le dossier correspondant.'); });
 document.querySelector('#nav-settings').addEventListener('click', event => { event.preventDefault(); notify('La clé Gemini se configure côté serveur dans .env.'); });
-renderAnalyses();
+void loadAnalyses();
 void checkBackend();
 
