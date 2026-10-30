@@ -7,6 +7,8 @@ Application web en cours de construction pour lancer une analyse stratégique à
 - Interface web servie par un backend Node.js (`server.js`).
 - Endpoint `GET /api/status` indiquant si la recherche est configurée, sans exposer de secret.
 - Endpoint `POST /api/analyze` qui interroge Gemini avec Grounding Google Search, puis renvoie une première synthèse, les requêtes et références associées.
+- Les dossiers sont enregistrés localement dans `D:\projet IA\veuille_strategique\analyses.json` via une couche isolée (`analysis-store.js`), remplaçable par un adaptateur Supabase lors de la migration. `DATA_DIR` permet de changer le dossier.
+- Routes `GET /api/analyses` et `POST /api/analyses` pour relire et enregistrer les dossiers. Les données ne sont pas envoyées à GitHub.
 - La clé `GEMINI_API_KEY` est lue depuis `.env` côté serveur. Elle n’est jamais envoyée au navigateur ni enregistrée dans Git.
 - Garde-fou local : au plus cinq recherches par minute.
 - Le navigateur affiche les sources comme des pistes à vérifier, pas comme des faits déjà validés.
