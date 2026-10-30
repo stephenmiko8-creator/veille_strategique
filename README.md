@@ -1,31 +1,38 @@
-# Veille — prototype d’application web
+# Veille stratégique
 
-Prototype d’interface pour le système de veille stratégique défini dans la conversation : une analyse à la demande, sans portefeuille d’entreprises obligatoire, avec validation humaine des divergences et questions ciblées quand les données disponibles ne suffisent pas.
+Application web en cours de construction pour lancer une analyse stratégique à la demande. Le parcours prévu garde les sources, fait remonter les contradictions pour validation humaine, demande les informations manquantes et relie les signaux aux données financières.
 
-## État actuel
+## Connexion en place
 
-Cette livraison est une maquette front-end autonome. Ouvrir `index.html` dans un navigateur. Elle permet de saisir une entreprise, de créer son dossier dans la session courante et d’afficher le parcours de préparation. Le formulaire ne déclenche pas de recherche web et le prototype n’invente aucune donnée ni conclusion.
+- Interface web servie par un backend Node.js (`server.js`).
+- Endpoint `GET /api/status` indiquant si la recherche est configurée, sans exposer de secret.
+- Endpoint `POST /api/analyze` qui interroge Brave Search API LLM Context une fois par lancement et renvoie les URLs, titres, domaines et extraits des résultats.
+- La clé est lue depuis `.env` côté serveur. Elle n’est jamais envoyée au navigateur ni enregistrée dans Git.
+- Garde-fou local : au plus cinq recherches par minute.
+- Le navigateur affiche les sources comme des pistes à vérifier, pas comme des faits déjà validés.
 
-## Parcours produit visé
+## Démarrage local
 
-1. L’utilisateur saisit un nom d’entreprise et confirme l’entité juridique.
-2. Le service collecte des sources publiques, conserve URL, date de publication, période couverte et périmètre de chaque donnée.
-3. Le moteur de rapprochement détecte les écarts sans choisir de valeur à la place de l’utilisateur.
-4. L’interface demande une validation explicite en présentant les sources côte à côte. La décision et son auteur sont conservés dans l’audit de l’analyse.
-5. Si une donnée manque, le système pose une question précise ou permet un dépôt de pièce. Les sections dépendantes restent signalées comme incomplètes.
-6. Le moteur produit une analyse multidimensionnelle reliée aux indicateurs financiers, distingue faits et interprétations et expose limites et confiance.
-7. L’utilisateur peut enregistrer une version du rapport et demander une mise à jour ponctuelle. Une surveillance récurrente reste opt-in.
+1. Installer Node.js 20 ou supérieur.
+2. Copier `.env.example` vers `.env`.
+3. Créer/activer une clé Brave Search API dans le [tableau de bord Brave](https://api-dashboard.search.brave.com/), puis renseigner `BRAVE_API_KEY` dans `.env`.
+4. Depuis le dossier du projet, lancer `npm start`.
+5. Ouvrir `http://localhost:3000`.
 
-## Étapes techniques suivantes
+Sans clé, l’interface et l’API de statut fonctionnent, mais aucune recherche externe n’est lancée. Le connecteur n’a pas été appelé pendant le développement, donc aucun quota ou crédit n’a été consommé.
 
-- Choisir et connecter un fournisseur de recherche web et des sources de référence.
-- Ajouter une API d’orchestration qui stocke les analyses, preuves, décisions de validation et versions de rapport.
-- Implémenter le modèle de données d’entreprise, métriques sourcées, contradictions, questions de complément et signaux.
-- Ajouter l’interface de validation des chiffres et de dépôt d’informations privées.
-- Construire les calculs financiers déterministes et la génération de rapport avec citations vérifiables.
-- Ajouter authentification, cloisonnement des dossiers et règles de conservation avant toute mise en production.
+## Limites actuelles
 
-## Statut GitHub
+- La recherche retourne des extraits et des références ; elle ne lit pas encore les documents entiers.
+- Aucune extraction structurée des chiffres financiers, détection de conflits, analyse multidimensionnelle ou génération de rapport n’est branchée.
+- Les dossiers sont conservés uniquement dans la mémoire de la page et disparaissent au rechargement.
+- L’application reste prévue pour un usage local. Avant toute mise en ligne : authentification, base de données, isolation des comptes, protections anti-abus, règles de confidentialité et hébergement sécurisé de la clé.
 
-Le connecteur GitHub a été utilisé pour examiner les dépôts disponibles. Aucun dépôt existant n’a le périmètre adapté ; les dépôts existants n’ont pas été modifiés. Le prototype reste dans l’espace de travail en attendant un dépôt dédié.
+## Évolution prévue
+
+1. Ajouter extraction et stockage sourcé des indicateurs avec période, devise, périmètre, date et URL.
+2. Repérer les contradictions sans choisir automatiquement et obtenir la validation utilisateur.
+3. Demander des compléments ciblés, puis exécuter les calculs financiers déterministes.
+4. Produire le rapport multidimensionnel avec limites et niveaux de preuve.
+5. Ajouter rapports versionnés et mises à jour ponctuelles ; la surveillance récurrente restera opt-in.
 
