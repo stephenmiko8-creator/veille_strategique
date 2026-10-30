@@ -4,9 +4,8 @@ import {extname, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
-const envPath = resolve(root, '.env');
 try {
-  const raw = readFileSync(envPath, 'utf8');
+  const raw = readFileSync(resolve(root, '.env'), 'utf8');
   for (const line of raw.split(/\r?\n/)) {
     const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
     if (match && process.env[match[1]] === undefined) {
@@ -16,8 +15,9 @@ try {
 } catch {}
 
 const port = Number(process.env.PORT || 3000);
-const apiKey = process.env.BRAVE_API_KEY?.trim();
-const searchTimestamps = [];
+const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+const requestTimestamps = [];
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -59,22 +59,50 @@ function readJson(request, maxBytes = 12_000) {
 
 function rateLimitReached() {
   const minuteAgo = Date.now() - 60_000;
-  while (searchTimestamps.length && searchTimestamps[0] < minuteAgo) searchTimestamps.shift();
-  if (searchTimestamps.length >= 5) return true;
-  searchTimestamps.push(Date.now());
+  while (requestTimestamps.length && requestTimestamps[0] < minuteAgo) requestTimestamps.shift();
+  if (requestTimestamps.length >= 5) return true;
+  requestTimestamps.push(Date.now());
   return false;
 }
 
-async function runSearch(company) {
-  const query = `${company} official company annual report financial results strategy sustainability technology news`;
-  const endpoint = new URL('https://api.search.brave.com/res/v1/llm/context');
-  endpoint.searchParams.set('q', query);
+function answerText(candidate) {
+  return (candidate?.content?.parts || []).map(part => part.text || '').filter(Boolean).join('\n').trim();
+}
+
+function citationAnswer(text, supports) {
+  let cited = text;
+  const ordered = [...(supports || [])].sort((a, b) => (b.segment?.endIndex ?? 0) - (a.segment?.endIndex ?? 0));
+  for (const support of ordered) {
+    const end = support.segment?.endIndex;
+    const ids = [...new Set(support.groundingChunkIndices || [])].filter(Number.isInteger);
+    if (end === undefined || end < 0 || end > cited.length || !ids.length) continue;
+    cited = `${cited.slice(0, end)} [${ids.map(id => id + 1).join(', ')}]${cited.slice(end)}`;
+  }
+  return cited;
+}
+
+async function runGroundedAnalysis(company) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   let response;
   try {
     response = await fetch(endpoint, {
-      headers: {accept: 'application/json', 'x-subscription-token': apiKey},
+      method: 'POST',
+      headers: {'content-type': 'application/json', 'x-goog-api-key': geminiApiKey},
+      body: JSON.stringify({
+        systemInstruction: {parts: [{text: [
+          'Tu es analyste de veille stratégique. Recherche des informations publiques actuelles avec Google Search et réponds en français.',
+          'Commence par signaler si le nom de société est ambigu et n’attribue pas des données à une entité sans preuve.',
+          'Sépare clairement les faits trouvés, leur source et leur date/période quand disponibles, puis les interprétations.',
+          'Distingue signaux à traiter des éléments qui restent à surveiller. Relie les constats aux chiffres financiers uniquement si les sources donnent ces chiffres.',
+          'N’invente aucun chiffre, causalité, intensité R&D, statut réglementaire ou citation. Mentionne les désaccords entre sources et les données qui manquent.',
+          'Pour chaque affirmation vérifiable, utilise les citations fournies par la recherche. Termine par les limites de cette première collecte et les informations à demander à l’utilisateur.'
+        ].join(' ')}]},
+        contents: [{role: 'user', parts: [{text: `Fais une première veille stratégique sourcée sur l’entreprise « ${company} ». Couvre son identité et activité, ses informations financières récentes disponibles, ses marchés et concurrents, les évolutions technologiques, économiques, réglementaires et sociétales/environnementales pertinentes, puis les signaux à suivre. Ne transforme pas l’absence de données en hypothèse.`}]}],
+        tools: [{google_search: {}}],
+        generationConfig: {temperature: 0.2, maxOutputTokens: 5000}
+      }),
       signal: controller.signal
     });
   } finally {
@@ -83,45 +111,51 @@ async function runSearch(company) {
   if (!response.ok) {
     const status = response.status === 401 || response.status === 403 ? 503 : response.status === 429 ? 429 : 502;
     const message = status === 503
-      ? 'La clé Brave Search API est invalide ou inactive.'
+      ? 'La clé Gemini est invalide, non autorisée ou inactive. Vérifie sa restriction à l’API Gemini.'
       : status === 429
-        ? 'Le quota ou la limite de requêtes Brave est atteint.'
-        : 'Le fournisseur de recherche n’a pas répondu correctement.';
+        ? 'La limite ou le quota Gemini est atteint.'
+        : 'Gemini n’a pas pu répondre. Vérifie le modèle configuré et réessaie.';
     throw Object.assign(new Error(message), {status});
   }
   const data = await response.json();
-  const records = data.grounding?.generic || [];
-  const sourceMetadata = data.sources || {};
-  const seen = new Set();
-  const sources = records.flatMap(record => {
-    if (!record.url || seen.has(record.url)) return [];
-    seen.add(record.url);
-    const metadata = sourceMetadata[record.url] || {};
-    return [{
-      title: record.title || metadata.title || record.url,
-      url: record.url,
-      hostname: metadata.hostname || new URL(record.url).hostname,
-      snippets: Array.isArray(record.snippets) ? record.snippets.slice(0, 2) : []
-    }];
+  const candidate = data.candidates?.[0];
+  const metadata = candidate?.groundingMetadata || {};
+  const sources = (metadata.groundingChunks || []).flatMap((chunk, index) => {
+    const web = chunk.web;
+    if (!web?.uri) return [];
+    let hostname = '';
+    try { hostname = new URL(web.uri).hostname; } catch {}
+    return [{number: index + 1, url: web.uri, title: web.title || hostname, hostname}];
   });
-  return {company, query, provider: 'Brave Search API', collectedAt: new Date().toISOString(), sources};
+  const answer = answerText(candidate);
+  if (!answer) throw Object.assign(new Error('Gemini a renvoyé une réponse vide ou bloquée.'), {status: 502});
+  return {
+    company,
+    provider: 'Gemini API + Google Search',
+    model,
+    collectedAt: new Date().toISOString(),
+    searchQueries: metadata.webSearchQueries || [],
+    answer: citationAnswer(answer, metadata.groundingSupports),
+    grounded: sources.length > 0,
+    sources
+  };
 }
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   if (request.method === 'GET' && url.pathname === '/api/status') {
-    return sendJson(response, 200, {searchConfigured: Boolean(apiKey), provider: 'Brave Search API'});
+    return sendJson(response, 200, {searchConfigured: Boolean(geminiApiKey), provider: 'Gemini API + Google Search', model});
   }
   if (request.method === 'POST' && url.pathname === '/api/analyze') {
-    if (!apiKey) return sendJson(response, 503, {error: 'La clé BRAVE_API_KEY n’est pas configurée côté serveur. Ajoute-la au fichier .env, sans la publier.'});
-    if (rateLimitReached()) return sendJson(response, 429, {error: 'Limite locale atteinte : maximum cinq recherches par minute.'});
+    if (!geminiApiKey) return sendJson(response, 503, {error: 'La variable GEMINI_API_KEY n’est pas configurée dans le fichier .env local.'});
+    if (rateLimitReached()) return sendJson(response, 429, {error: 'Limite locale atteinte : maximum cinq analyses par minute.'});
     try {
       const payload = await readJson(request);
       const company = typeof payload.company === 'string' ? payload.company.trim() : '';
       if (company.length < 2 || company.length > 150) {
         return sendJson(response, 400, {error: 'Le nom de l’entreprise doit contenir entre 2 et 150 caractères.'});
       }
-      const result = await runSearch(company);
+      const result = await runGroundedAnalysis(company);
       return sendJson(response, 200, result);
     } catch (error) {
       return sendJson(response, error.status || 502, {error: error.status ? error.message : 'La collecte a échoué ou a expiré. Réessaie plus tard.'});
@@ -129,7 +163,9 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname.startsWith('/api/')) return sendJson(response, 404, {error: 'Route API inconnue.'});
 
-  const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  let pathname;
+  try { pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname); }
+  catch { return sendJson(response, 400, {error: 'Chemin invalide.'}); }
   const filePath = resolve(root, `.${pathname}`);
   if (filePath !== root && !filePath.startsWith(root + sep)) return sendJson(response, 403, {error: 'Accès refusé.'});
   readFile(filePath, (error, contents) => {
@@ -141,6 +177,6 @@ const server = createServer(async (request, response) => {
 
 server.listen(port, '127.0.0.1', () => {
   console.log(`Veille prête sur http://localhost:${port}`);
-  console.log(apiKey ? 'Brave Search API configuré.' : 'Recherche externe inactive : BRAVE_API_KEY manquante dans .env.');
+  console.log(geminiApiKey ? `Gemini configuré (${model}); les recherches partent sur demande.` : 'Gemini inactif : GEMINI_API_KEY manquante dans .env.');
 });
 
