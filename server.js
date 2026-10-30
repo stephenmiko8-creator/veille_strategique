@@ -2,6 +2,7 @@ import {createServer} from 'node:http';
 import {readFile, readFileSync} from 'node:fs';
 import {extname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {listAnalyses, saveAnalysis} from './analysis-store.js';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 try {
@@ -147,6 +148,35 @@ const server = createServer(async (request, response) => {
   if (request.method === 'GET' && url.pathname === '/api/status') {
     return sendJson(response, 200, {searchConfigured: Boolean(geminiApiKey), provider: 'Gemini API + Google Search', model});
   }
+  if (request.method === 'GET' && url.pathname === '/api/analyses') {
+    try { return sendJson(response, 200, {analyses: await listAnalyses()}); }
+    catch { return sendJson(response, 500, {error: 'Le stockage local des analyses est indisponible.'}); }
+  }
+  if (request.method === 'POST' && url.pathname === '/api/analyses') {
+    try {
+      const payload = await readJson(request, 100_000);
+      const item = payload.analysis;
+      if (!item || typeof item.name !== 'string' || item.name.trim().length < 2 || item.name.length > 150) {
+        return sendJson(response, 400, {error: 'Le dossier doit contenir un nom d’entreprise valide.'});
+      }
+      const record = await saveAnalysis({
+        id: typeof item.id === 'string' ? item.id : undefined,
+        name: item.name.trim(),
+        date: typeof item.date === 'string' ? item.date.slice(0, 80) : '',
+        status: typeof item.status === 'string' ? item.status.slice(0, 40) : 'saved',
+        error: typeof item.error === 'string' ? item.error.slice(0, 1000) : undefined,
+        answer: typeof item.answer === 'string' ? item.answer.slice(0, 30_000) : '',
+        grounded: Boolean(item.grounded),
+        sources: Array.isArray(item.sources) ? item.sources.slice(0, 100) : [],
+        searchQueries: Array.isArray(item.searchQueries) ? item.searchQueries.slice(0, 30) : [],
+        collectedAt: typeof item.collectedAt === 'string' ? item.collectedAt.slice(0, 80) : undefined,
+        provider: typeof item.provider === 'string' ? item.provider.slice(0, 100) : undefined
+      });
+      return sendJson(response, 200, {analysis: record});
+    } catch {
+      return sendJson(response, 500, {error: 'Impossible d’enregistrer le dossier sur le disque local.'});
+    }
+  }
   if (request.method === 'POST' && url.pathname === '/api/analyze') {
     if (!geminiApiKey) return sendJson(response, 503, {error: 'La variable GEMINI_API_KEY n’est pas configurée dans le fichier .env local.'});
     if (rateLimitReached()) return sendJson(response, 429, {error: 'Limite locale atteinte : maximum cinq analyses par minute.'});
@@ -157,7 +187,8 @@ const server = createServer(async (request, response) => {
         return sendJson(response, 400, {error: 'Le nom de l’entreprise doit contenir entre 2 et 150 caractères.'});
       }
       const result = await runGroundedAnalysis(company);
-      return sendJson(response, 200, result);
+      const saved = await saveAnalysis({id: payload.id, name: company, date: new Intl.DateTimeFormat('fr-FR', {day: 'numeric', month: 'short', year: 'numeric'}).format(new Date()), status: 'collected', ...result});
+      return sendJson(response, 200, saved);
     } catch (error) {
       return sendJson(response, error.status || 502, {error: error.status ? error.message : 'La collecte a échoué ou a expiré. Réessaie plus tard.'});
     }
