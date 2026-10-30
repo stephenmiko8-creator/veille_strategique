@@ -1,0 +1,7 @@
+.system-status.disconnected{color:#a57942}.system-status.disconnected i{background:#c99b5e}.system-status.connected{color:#4c8b6d}
+.search-results{margin:0 0 17px;border:1px solid #e7eeea;border-radius:8px;padding:11px;background:#fbfdfc;max-height:255px;overflow:auto}
+.results-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px;font-size:9px;color:#7b8882}.results-heading strong{font-size:10px;color:#52625a}
+.source-result{padding:9px 1px;border-top:1px solid #edf1ef}.source-result:first-child{border-top:0}.source-result a{font-size:10px;line-height:1.45;font-weight:600;color:#256d55;text-decoration:none}.source-result a:hover{text-decoration:underline}.source-result .source-host{font-size:8px;color:#9ba6a1;margin:3px 0 5px;word-break:break-all}.source-result p{font-size:9px;line-height:1.5;color:#74817b;margin:0}
+.source-caveat{font-size:8px;color:#9a8b71;border-top:1px solid #edf1ef;padding-top:8px;margin:7px 0 0;line-height:1.45}.readiness-box.error{border-color:#f0dfd7;background:#fdf8f6}.readiness-box.error .readiness-icon{background:#f5e4dd;color:#ae6a4d}.readiness-box.loading .readiness-icon{background:#e6f1eb;color:#4a8c6e}
+@media(max-width:720px){.system-status{font-size:0!important}}
+
